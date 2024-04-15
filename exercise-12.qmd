@@ -1,0 +1,255 @@
+---
+title: "exercise-12"
+author: "Erika Carlson"
+date: 2024-04-14
+format: html
+editor_options: 
+  chunk_output_type: console
+---
+
+# Exercise 12 {.unnumbered}
+
+# Practice Model Selection {.unnumbered}
+
+## Preliminaries {.unnumbered}
+
+* Load the "Mammal_lifehistories_v2" dataset as a "tibble" named **d**. 
+  + This dataset compiles life history and other variables for over 1400 species of placental mammals from 17 different Orders.
+
+> **Data source**:
+>
+> Ernest SKM. (2003). Life history characteristics of placental nonvolant mammals. *Ecology* 84: 3402–3402.
+
+```{r}
+library(tidyverse)
+d <- read_tsv("https://raw.githubusercontent.com/difiore/ada-2024-datasets/main/Mammal_lifehistories_v2.txt", col_names = TRUE)
+```
+
+* Use {skimr} package to conduct exploratory data analysis. 
+
+```{r}
+library(skimr)
+skim(d)
+```
+
+* Which of the variables are categorical and which are numeric?
+  + *Categorical: order, family, Genus, and species* 
+  + *Numeric: mass(g), gestation(mo), newborn(g), weaning(mo), wean mass(g), AFR(mo), max. life(mo), litter size, litters/year, refs*
+
+## Challenge {.unnumbered}
+#### Step 1 {.unnumbered}
+
+* Replace all values of -999 (the authors' code for missing data) with `NA`.
+
+```{r}
+d <- d %>% mutate(across(`mass(g)`:`litters/year`, \(x) na_if(x, -999)))
+# For `across()` Supply arguments directly to `.fns` through an anonymous function
+```
+
+#### Step 2 {.unnumbered}
+
+* Drop the variables **litter size** and **refs**.
+
+```{r}
+d <- d %>% dplyr::select(-refs, -`litter size`)
+```
+
+#### Step 3 {.unnumbered}
+
+* Log transform **all** of the other numeric variables.
+
+```{r}
+s <- d %>% mutate(across(`mass(g)`:`litters/year`, \(x) log(x)))
+
+# make new column names
+s <- s %>% rename(logMass = `mass(g)`,
+                  logGest = `gestation(mo)`,
+                  logNewbornMass = `newborn(g)`,
+                  logWean = `weaning(mo)`,
+                  logWeaningMass = `wean mass(g)`,
+                  logAFR = `AFR(mo)`,
+                  logLife = `max. life(mo)`,
+                  logLitter = `litters/year`
+                  )
+```
+
+#### Step 4 {.unnumbered}
+
+* Regress the (now log transformed) age [**logGest**, **logWean**, **logAFR** (age at first reproduction), and **logLife** (maximum lifespan)] and mass [**logNewbornMass** and **logWeaningMass**] variables on (now log transformed) overall body **logMass** and add the residuals to the dataframe as new variables (**relGest**, **relWean**, **relAFR**, **relLife**, **relNewbornMass**, and **relWeaningMass**).
+
+> **HINT:** Use "na.action=na.exclude" in your`lm()` calls. With this argument set, the residuals will be padded to the correct length by inserting NAs for cases with missing data.
+
+```{r}
+relGest_model <- lm(logMass ~ logGest, na.action = na.exclude, data = s)
+s$relGest <- resid(relGest_model)
+
+relWean_model <- lm(logMass ~ logWean, na.action = na.exclude, data = s)
+s$relWean <- resid(relWean_model)
+
+relAFR_model <- lm(logMass ~ logAFR, na.action = na.exclude, data = s)
+s$relAFR <- resid(relAFR_model)
+
+relLife_model <- lm(logMass ~ logLife, na.action = na.exclude, data = s)
+s$relLife <- resid(relLife_model)
+
+relNewbornMass_model <- lm(logMass ~ logNewbornMass, na.action = na.exclude , data = s)
+s$relNewbornMass <- resid(relNewbornMass_model)
+
+relWeaningMass_model <- lm(logMass ~ logWeaningMass, na.action = na.exclude, data = s)
+s$relWeaningMass <- resid(relWeaningMass_model)
+```
+
+#### Step 5 {.unnumbered}
+
+* Plot residuals of max lifespan (**relLife**) in relation to **Order**. Which mammalian orders have the highest residual lifespan?
+  + *Artiodactyla, Cetacea, Perissodactyla, Proboscidea*
+* Plot residuals of newborn mass (**relNewbornMass**) in relation to **Order**. Which mammalian orders have the have highest residual newborn mass?
+  + *Carnivora, Perissodactyla*
+  + *Proboscidea, Tubulidentata also high but very low n*
+* Plot residuals of weaning mass (**relWeaningMass**) in relation to **Order**. Which mammalian orders have the have highest relative weaning mass?
+  + *Pholidota, Lagomorpha, Carnivora *
+  + *Sirenia, Tubulidentata, Xenarthra, Hyracoidea also high but very low n*
+
+> **NOTE:** There will be lots of missing data for the latter two variables!
+
+```{r}
+p1 <- ggplot(data = s %>% drop_na(relLife),
+             aes(x = order, y = relLife)) +
+  geom_boxplot() +
+  geom_point(alpha = 0.4) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  scale_y_continuous(limits = c(NA, NA))
+p1
+
+p2 <- ggplot(data = s %>% drop_na(relNewbornMass),
+             aes(x = order, y = relNewbornMass)) +
+  geom_boxplot() +
+  geom_point(alpha = 0.4) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  scale_y_continuous(limits = c(NA, NA))
+p2
+
+p3 <- ggplot(data = s %>% drop_na(relWeaningMass),
+             aes(x = order, y = relWeaningMass)) +
+  geom_boxplot() +
+  geom_point(alpha = 0.4) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  scale_y_continuous(limits = c(NA, NA)) 
+p3
+```
+
+#### Step 6 {.unnumbered}
+
+* Run models and a model selection process to evaluate what variables best predict each of the two response variables, **logLife** and **logAFR**, from the set of the following predictors: **logGest**, **logNewbornMass**, **logWean**, **logWeaningMass**, **logLitters**, and **logMass**.
+
+```{r}
+# for logLife
+
+# winnow dataset to drop rows that are missing the response variable or any of the predictors
+s1 <- s %>% drop_na(logLife, logGest, logNewbornMass, logWeaningMass, logWean, logLitter, logMass)
+
+# model selection using reverse screening (the long way)
+full <- lm(data = s1, logLife ~ logGest + logNewbornMass + logWeaningMass + logWean + logLitter + logMass)
+summary(full) 
+
+drop1(full, test = "F") # logWeaningMass has non-sig p-value, lowest F, and lowest increase in RSS 
+
+m1 <- update(full, . ~ . - logWeaningMass)
+summary(m1)
+
+drop1(m1, test = "F") # logNewbornMass has non-sig p-value, lowest F, and lowest increase in RSS
+
+m2 <- update(m1, . ~ . - logNewbornMass)
+summary(m2)
+
+drop1(m2, test = "F") # all explanatory variables are significant, model 2 is best
+
+# logWean has lowest F value and lowest increase in RSS
+m3 <- update(m2, . ~ . - logWean)
+summary(m3) # lower adjusted R-squared than model 2
+
+# model selection using AIC (to verify)
+library(MASS)
+(step1 <- stepAIC(full_m1, scope = . ~ ., direction = "both"))
+detach(package:MASS)
+
+# model comparisons using AICc
+library(MuMIn)
+full <- lm(data = s1, logLife ~ logGest + logNewbornMass + logWeaningMass + logWean + logLitter + logMass, na.action = na.fail)
+# include 'na.fail' in 'na.action' argument to prevent `dredge()` from trying to fit submodels with different data sets than the global model if there are missing values
+
+mods <- dredge(full)
+(mods_delta <- subset(mods, delta <= 4)) # limit models to delta AICc of 4 of less
+
+# average coefficients for top models where delta.aicc <= 4
+mods.avg <- summary(model.avg(mods, subset = delta <= 4, fit = TRUE))
+
+mods.avg$msTable
+
+# CIs for averaged beta coefficient estimates
+confint(mods.avg)
+
+plot(mods.avg, full = TRUE)
+
+detach(package:MuMIn)
+```
+
+* The best model for **logLife** includes predictor variables **logWean**, **logLitter**, **logGest**, and **logMass** with AICc of 264.6
+* Five models have a delta AICc of 4 or less
+* **logGest**, **logLitter**, and **logWean** appear in all "top" models
+
+```{r}
+# for logAFR
+
+# winnow dataset to drop rows that are missing the response variable or any of the predictors
+s2 <- s %>% drop_na(logAFR, logGest, logNewbornMass, logWeaningMass, logWean, logLitter, logMass)
+
+# model selection using reverse screening (the long way)
+full <- lm(data = s2, logAFR ~ logGest + logNewbornMass + logWeaningMass + logWean + logLitter + logMass)
+summary(full) 
+
+drop1(full, test = "F") # logWeaningMass has non-sig p-value, lowest F, and lowest increase in RSS 
+
+m1 <- update(full, . ~ . - logWeaningMass)
+summary(m1)
+
+drop1(m1, test = "F") # logNewbornMass has non-sig p-value, lowest F, and lowest increase in RSS
+
+m2 <- update(m1, . ~ . - logNewbornMass)
+summary(m2)
+
+drop1(m2, test = "F") # all explanatory variables are significant, model 2 is best
+
+# logWean has lowest F value and lowest increase in RSS
+m3 <- update(m2, . ~ . - logWean)
+summary(m3) # lower adjusted R-squared than model 2
+
+# model selection using AIC (to verify)
+library(MASS)
+(step1 <- stepAIC(full, scope = . ~ ., direction = "both"))
+detach(package:MASS)
+
+# model comparisons using AICc
+library(MuMIn)
+full <- lm(data = s2, logAFR ~ logGest + logNewbornMass + logWeaningMass + logWean + logLitter + logMass, na.action = na.fail)
+# include 'na.fail' in 'na.action' argument to prevent `dredge()` from trying to fit submodels with different data sets than the global model if there are missing values
+
+mods <- dredge(full)
+(mods_delta <- subset(mods, delta <= 4)) # limit models to delta AICc of 4 of less
+
+# average coefficients for top models where delta.aicc <= 4
+mods.avg <- summary(model.avg(mods, subset = delta <= 4, fit = TRUE))
+
+mods.avg$msTable
+
+# CIs for averaged beta coefficient estimates
+confint(mods.avg)
+
+plot(mods.avg, full = TRUE)
+
+detach(package:MuMIn)
+```
+
+* The best model for **logAFR** includes predictor variables **logWean**, **logLitter**, **logGest**, and **logMass** with AICc of 412.0
+* Seven models have a delta AICc of 4 or less
+* **logGest**, **logLitter**, and **logWean** appear in all "top" models
