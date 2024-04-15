@@ -21,6 +21,8 @@ editor_options:
 > Ernest SKM. (2003). Life history characteristics of placental nonvolant mammals. *Ecology* 84: 3402–3402.
 
 ```{r}
+#| warning: false
+
 library(tidyverse)
 d <- read_tsv("https://raw.githubusercontent.com/difiore/ada-2024-datasets/main/Mammal_lifehistories_v2.txt", col_names = TRUE)
 ```
@@ -103,14 +105,6 @@ s$relWeaningMass <- resid(relWeaningMass_model)
 
 * Plot residuals of max lifespan (**relLife**) in relation to **Order**. Which mammalian orders have the highest residual lifespan?
   + *Artiodactyla, Cetacea, Perissodactyla, Proboscidea*
-* Plot residuals of newborn mass (**relNewbornMass**) in relation to **Order**. Which mammalian orders have the have highest residual newborn mass?
-  + *Carnivora, Perissodactyla*
-  + *Proboscidea, Tubulidentata also high but very low n*
-* Plot residuals of weaning mass (**relWeaningMass**) in relation to **Order**. Which mammalian orders have the have highest relative weaning mass?
-  + *Pholidota, Lagomorpha, Carnivora *
-  + *Sirenia, Tubulidentata, Xenarthra, Hyracoidea also high but very low n*
-
-> **NOTE:** There will be lots of missing data for the latter two variables!
 
 ```{r}
 p1 <- ggplot(data = s %>% drop_na(relLife),
@@ -120,7 +114,13 @@ p1 <- ggplot(data = s %>% drop_na(relLife),
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
   scale_y_continuous(limits = c(NA, NA))
 p1
+```
 
+* Plot residuals of newborn mass (**relNewbornMass**) in relation to **Order**. Which mammalian orders have the have highest residual newborn mass?
+  + *Carnivora, Perissodactyla*
+  + *Proboscidea, Tubulidentata also high but very low n*
+  
+```{r}
 p2 <- ggplot(data = s %>% drop_na(relNewbornMass),
              aes(x = order, y = relNewbornMass)) +
   geom_boxplot() +
@@ -128,7 +128,13 @@ p2 <- ggplot(data = s %>% drop_na(relNewbornMass),
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
   scale_y_continuous(limits = c(NA, NA))
 p2
+```
 
+* Plot residuals of weaning mass (**relWeaningMass**) in relation to **Order**. Which mammalian orders have the have highest relative weaning mass?
+  + *Pholidota, Lagomorpha, Carnivora *
+  + *Sirenia, Tubulidentata, Xenarthra, Hyracoidea also high but very low n*
+  
+```{r}  
 p3 <- ggplot(data = s %>% drop_na(relWeaningMass),
              aes(x = order, y = relWeaningMass)) +
   geom_boxplot() +
@@ -142,8 +148,14 @@ p3
 
 * Run models and a model selection process to evaluate what variables best predict each of the two response variables, **logLife** and **logAFR**, from the set of the following predictors: **logGest**, **logNewbornMass**, **logWean**, **logWeaningMass**, **logLitters**, and **logMass**.
 
+##### Models and model selection for logLife
+
+* The best model for **logLife** includes predictor variables **logWean**, **logLitter**, **logGest**, and **logMass** with AICc of 264.6
+* Five models have a delta AICc of 4 or less
+* **logGest**, **logLitter**, and **logWean** appear in all "top" models
+
 ```{r}
-# for logLife
+#| warning: false 
 
 # winnow dataset to drop rows that are missing the response variable or any of the predictors
 s1 <- s %>% drop_na(logLife, logGest, logNewbornMass, logWeaningMass, logWean, logLitter, logMass)
@@ -170,7 +182,7 @@ summary(m3) # lower adjusted R-squared than model 2
 
 # model selection using AIC (to verify)
 library(MASS)
-(step1 <- stepAIC(full_m1, scope = . ~ ., direction = "both"))
+(step1 <- stepAIC(full, scope = . ~ ., direction = "both"))
 detach(package:MASS)
 
 # model comparisons using AICc
@@ -194,12 +206,14 @@ plot(mods.avg, full = TRUE)
 detach(package:MuMIn)
 ```
 
-* The best model for **logLife** includes predictor variables **logWean**, **logLitter**, **logGest**, and **logMass** with AICc of 264.6
-* Five models have a delta AICc of 4 or less
+##### Models and model selection for logAFR
+
+* The best model for **logAFR** includes predictor variables **logWean**, **logLitter**, **logGest**, and **logMass** with AICc of 412.0
+* Seven models have a delta AICc of 4 or less
 * **logGest**, **logLitter**, and **logWean** appear in all "top" models
 
 ```{r}
-# for logAFR
+#| warning: false 
 
 # winnow dataset to drop rows that are missing the response variable or any of the predictors
 s2 <- s %>% drop_na(logAFR, logGest, logNewbornMass, logWeaningMass, logWean, logLitter, logMass)
@@ -249,7 +263,3 @@ plot(mods.avg, full = TRUE)
 
 detach(package:MuMIn)
 ```
-
-* The best model for **logAFR** includes predictor variables **logWean**, **logLitter**, **logGest**, and **logMass** with AICc of 412.0
-* Seven models have a delta AICc of 4 or less
-* **logGest**, **logLitter**, and **logWean** appear in all "top" models
